@@ -1,0 +1,15 @@
+CXX = c++
+CXXFLAGS = -Wall -Wextra -lm
+TARGET = KittenSweeper
+
+
+
+all:  $(TARGET)
+
+$(TARGET):
+	$(CC) $(CXXFLAGS) src/*.cpp -o $(TARGET) /home/john/lib/libraylib.a
+debug:
+	$(CC) $(CXXFLAGS) -g src/*.cpp -o $(TARGET) /home/john/lib/libraylib.a
+clean:
+	rm KittenSweeper
+

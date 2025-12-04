@@ -1,0 +1,217 @@
+#include <csignal>
+#include <cstdlib>
+#include <cstdio>
+#include <time.h>
+#include <raylib.h>
+#define WINDOW_WIDTH 486
+#define WINDOW_HEIGHT 486
+#define GRID_START 100
+//ASSET_FOLDER /home/john/code/cpp/kittensweeper/assests/
+// can be scaled in the future for now just assume 9x9 grid
+const Color BackGroundColor{
+  .r = 192,
+  .g = 192,
+  .b = 192,
+  .a = 255,
+};
+ 
+Vector2 SqaureSize{
+    .x = 54,
+    .y = 54,
+};
+// since I don't have custom number textures yet I just snprintf the numbers and display them as text
+// this is the buffer
+char NumberBuffer[4];
+Texture2D DefaultBoxTexture;
+Texture2D PressedBoxTexture;
+Texture2D EvilMineCat;
+Texture2D YellowCatAlive;
+Texture2D YellowCatDead;
+Texture2D YellowCatDeadPressed;
+Texture2D YellowCatAlivePressed;
+struct Cell {
+  bool IsAMine = false;
+  bool Pressed = false;
+  Vector2 postion;
+  int MinesInArea;
+};
+
+Cell MineGrid[9][9];
+bool GameOver = false;
+
+void generate_random_mines();
+void init_mine_grid();
+inline void handle_cell_texture(Cell current_cell,Rectangle TextureSource,Rectangle concated_shape);
+void load_assests();
+void unload_assests();
+void render_game_state();
+void calculate_mines_in_area(int in, int total_mines);
+void handle_resize();
+
+
+int main(void) {
+  init_mine_grid();
+  InitWindow(486, 586, "KittenSweeper! :3");
+  SetTargetFPS(60);
+  load_assests();
+  BeginDrawing();
+  render_game_state();
+  EndDrawing();
+  for (; !WindowShouldClose();) {
+	BeginDrawing();
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      Vector2 mouse_pos = GetMousePosition();
+      int gridX = int((mouse_pos.x / SqaureSize.x));
+  int gridY = int(((mouse_pos.y - 100) / SqaureSize.y));
+      MineGrid[gridY][gridX].Pressed = true;
+      if (MineGrid[gridY][gridX].IsAMine) {
+		GameOver = true;
+      }
+	  render_game_state();
+    }
+    if (IsKeyPressed(KEY_Q)) {
+	  EndDrawing();
+      CloseWindow();
+	  break;
+    }
+	 
+   EndDrawing();
+  }
+}
+
+void render_game_state() {
+  ClearBackground(BackGroundColor);
+  //DrawText("What the hell??",0,0,12,WHITE);
+  const Rectangle TextureSource{
+      .x = 0,
+      .y = 0,
+      .width = float(DefaultBoxTexture.width),
+      .height = float(DefaultBoxTexture.height),
+  };
+  for (int I = 0; I < 9; I++) {
+    for (int i = 0; i < 9; i++) {
+	  Cell current_cell = MineGrid[I][i];
+          Rectangle concated_shape = {
+              .x = current_cell.postion.x,
+              .y = current_cell.postion.y,
+              .width = SqaureSize.y,
+              .height = SqaureSize.x,
+          };
+	 if (current_cell.Pressed){
+	  handle_cell_texture(current_cell,TextureSource,concated_shape);
+    } else {
+      DrawTexturePro(DefaultBoxTexture, TextureSource, concated_shape,
+                     Vector2{0.0, 0.0}, 0.0f, WHITE);
+   }
+	 //debug for mine calculation
+	  // if (current_cell.IsAMine) {
+	  // 	DrawText("M",(current_cell.postion.x),(current_cell.postion.y),20,RED);
+      // } else {
+      //   snprintf(NumberBuffer, sizeof(NumberBuffer), "%d",
+      //                 current_cell.MinesInArea);
+	  // 	DrawText(NumberBuffer,(current_cell.postion.x),(current_cell.postion.y),20,GREEN);
+      // }
+    }
+  }
+}
+// don't know if the inline keyword actually does anything on modern compilers?
+// made this a seperate function so the render loop isn't as verbose
+inline void handle_cell_texture(Cell current_cell,Rectangle TextureSource,Rectangle concated_shape) {
+  if (current_cell.IsAMine) {
+    Rectangle MineTextureSource {
+      .x = 0, .y = 0,
+	  .width = float(EvilMineCat.width),.height = float(EvilMineCat.height),
+    };
+    DrawTexturePro(EvilMineCat, MineTextureSource, concated_shape,
+                   Vector2{0.0, 0.0}, 0.0f, WHITE);
+	return;
+  }
+  // TODO alssya is working on custom number assests for me. For now I'm just
+  // going to print the number as text for now
+  DrawTexturePro(PressedBoxTexture, TextureSource, concated_shape,
+                 Vector2{0.0, 0.0}, 0.0f, WHITE);
+  snprintf(NumberBuffer, sizeof(NumberBuffer), "%d", current_cell.MinesInArea);
+  DrawText(NumberBuffer,concated_shape.x + (concated_shape.width / 2),concated_shape.y + (concated_shape.height / 2),20,RED);
+}
+// in the future this will have to load a larger amount of assests
+void load_assests() {
+  DefaultBoxTexture = LoadTexture("./src/assests/defaultunpressed.png");
+  PressedBoxTexture = LoadTexture("./src/assests/defaultpressed.png");
+  EvilMineCat = LoadTexture("./src/assests/evilcatpressed.png");
+  YellowCatAlive = LoadTexture("./src/assests/yellowcatun.png");
+  YellowCatAlivePressed = LoadTexture("./src/assests/yellowcatpr.png");
+  YellowCatDead = LoadTexture("./src/assests/deadyellowcat.png");
+}
+void unload_assests() {
+  UnloadTexture(DefaultBoxTexture);
+  UnloadTexture(PressedBoxTexture);
+  UnloadTexture(EvilMineCat);
+  UnloadTexture(YelloCatAlive);
+  UnloadTexture(YellowCatAlivePressed);
+  UnloadTexture(YellowCatDead);
+}
+
+void generate_random_mines(int in,int total_mines) {
+  int counter = in;
+  int RandRow = rand() % 9;
+  int RandCol = rand() % 9;
+  if (MineGrid[RandRow][RandCol].IsAMine) {
+	return generate_random_mines(counter,total_mines);
+  }
+  MineGrid[RandRow][RandCol].IsAMine = true;
+  counter++;
+  if (counter < total_mines) {
+	return generate_random_mines(counter,total_mines);
+  }
+  return;
+}
+// I could of probably done this better
+void calculate_mines_in_area() {
+  for (int I = 0; I < 9; I++) {
+    for (int i = 0; i < 9; i++) {
+      Cell current_cell = MineGrid[I][i];
+	  if(!current_cell.IsAMine){
+		continue;
+	  }
+	  if(I){
+	   MineGrid[I-1][i].MinesInArea++;
+	 }
+	 if(i){
+	   MineGrid[I][i - 1].MinesInArea++;  
+	 }
+	 if(I != 8){
+	   MineGrid[I+1][i].MinesInArea++;
+	 }
+	 if(i != 8){
+	   MineGrid[I][i+1].MinesInArea++; 
+	 }
+	 if(I && i){
+	   MineGrid[I-1][i-1].MinesInArea++;
+	 }
+	 if(I != 8 && i != 8){
+	   MineGrid[I+1][i+1].MinesInArea++;
+	 }
+	 if(I != 8 && i){
+	   MineGrid[I + 1][i-1].MinesInArea++;
+	 }
+	 if(I && i != 8){
+	   MineGrid[I - 1][i + 1].MinesInArea++;
+	 }
+ 	}
+  }
+}
+void init_mine_grid() {
+  int X = 0;
+  int Y = GRID_START;
+  for (int I = 0; I < 9; I++) {
+    for (int i = 0; i < 9; i++) {
+      MineGrid[I][i].postion = Vector2{.x = float(X), .y = float(Y)};
+	  X += SqaureSize.x;
+    }
+    X = 0;
+	Y += SqaureSize.y;
+  }
+  srand(time(0));
+  generate_random_mines(0,10);
+  calculate_mines_in_area();
+} 
