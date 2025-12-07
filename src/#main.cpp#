@@ -242,7 +242,8 @@ void unload_assests() {
 
 //default is to start going to the right
 void flood_fill(int Sx, int Sy){
-  Vector2I cord_queue[61];
+  Vector2I cord_queue[71];
+  Vector2i cord_map[71];
   int qp = 0;
   int ql = 1;
   cord_queue[0].x = Sx;
@@ -285,6 +286,15 @@ void flood_fill(int Sx, int Sy){
   }
 
   }
+}
+bool check_queue(Vector2I *queue, int ql,Vector2I cords){
+  for(int i = 0; i < ql; i++){
+	
+  }
+}
+
+void insert_map(Vector2I *map, int map_cap,Vector2i cords,int index){
+  
 }
 
 void generate_random_mines(int in,int total_mines) {
