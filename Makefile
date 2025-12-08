@@ -9,7 +9,7 @@ all:  $(TARGET)
 $(TARGET):
 	$(CXX) $(CXXFLAGS) src/*.cpp -o $(TARGET)  
 debug:
-	$(CXX) $(CXXFLAGS) -g src/*.cpp -o $(TARGET) 
+	$(CXX) $(CXXFLAGS) -ggdb src/*.cpp -o $(TARGET) 
 clean:
 	rm KittenSweeper
 

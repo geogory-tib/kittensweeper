@@ -1,0 +1,47 @@
+package main
+
+import (
+	"fmt"
+	"math/rand"
+)
+
+type Vector2I struct{
+	x,y int
+}
+
+func(v Vector2I)same(v2 Vector2I) bool{
+	if(v.x == v2.x && v.y == v2.y){
+		return true
+	}
+	return false
+}
+func hash_func(x,y,length int) int{
+	X2 := (x + y * 4) % length
+	Y2 := (y + x * 10) % length
+	hash := (X2 + Y2 * 22) % length
+	return hash
+}
+
+
+func main(){
+	m := make(map[int]Vector2I)
+	for _ = range 100{
+		vec := Vector2I{}
+		vec.x = rand.Int() % 9
+		vec.y = rand.Int() % 9
+		hsh := hash_func(vec.x,vec.y,71)
+		fmt.Printf("Inputs %v, hash: hsh %d\n",vec,hsh)
+		vec_test,ok := m[hsh]
+		if(!ok){
+			m[hsh] = vec
+		}
+		if(vec.same(vec_test)){
+			fmt.Printf("Vec %v, Vec_Test %v ", vec,vec_test)
+			fmt.Println("Same Cord")
+			
+		}else{
+			fmt.Printf("Vec %v Vec_Test %v ",vec,vec_test)
+			fmt.Println("Collison")
+		}
+	}	
+}

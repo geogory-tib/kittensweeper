@@ -1,3 +1,5 @@
+#include <cassert>
+#include <csignal>
 #include <cstdlib>
 #include <cstdio>
 #include <time.h>
@@ -6,6 +8,7 @@
 #define WINDOW_WIDTH 486
 #define WINDOW_HEIGHT 486
 #define GRID_START 100
+#define APPEND_QUEUE(queue,ql,x,y) queue[ql] = {x,y}; ql++;
 const Color BackGroundColor{
   .r = 192,
   .g = 192,
@@ -71,6 +74,8 @@ inline void render_restart_button();
 void generate_random_mines();
 
 void flood_fill(int Sx, int Sy);
+
+bool flood_check(Vector2I *queue, int ql, Vector2I cord);
 
 void init_mine_grid();
 
@@ -240,7 +245,7 @@ void unload_assests() {
   UnloadTexture(YellowCatDead);
 }
 
-//default is to start going to the right
+
 void flood_fill(int Sx, int Sy){
   Vector2I cord_queue[61];
   int qp = 0;
@@ -250,41 +255,136 @@ void flood_fill(int Sx, int Sy){
   
   for(;qp < ql;qp++){
 	Vector2I current_cords = cord_queue[qp];
+	Cell *adjacent_cell;
+	
 	if(current_cords.x){
-	  MineGrid[current_cords.y][current_cords.x -1].Pressed = true;
-	  if(MineGrid[current_cords.y][current_cords.x -1].MinesInArea == 0){
-		cord_queue[ql].x = current_cords.x - 1;
-		cord_queue[ql].y = current_cords.y;
-		ql++;
+	  adjacent_cell = &MineGrid[current_cords.y][current_cords.x - 1];
+	  adjacent_cell->Pressed = true;
+	  NonMinesLeft--;
+	  if (adjacent_cell->IsAMine){
+	    adjacent_cell->Pressed = false;
+		NonMinesLeft--;
+	  }
+	  if(adjacent_cell->MinesInArea == 0){
+		if(!flood_check(cord_queue, ql, {current_cords.x-1,current_cords.y})){
+		  APPEND_QUEUE(cord_queue, ql, current_cords.x - 1, current_cords.y);
+		}
 	  }
 	}
 	if(current_cords.y){
-	  MineGrid[current_cords.y - 1][current_cords.x].Pressed = true;
-	  if( MineGrid[current_cords.y - 1][current_cords.x].MinesInArea == 0 ){
-		cord_queue[ql].x = current_cords.x;
-		cord_queue[ql].y = current_cords.y - 1;
-		ql++;
+	  adjacent_cell = &MineGrid[current_cords.y - 1][current_cords.x];
+	  adjacent_cell->Pressed = true;
+	  NonMinesLeft--;
+	  if (adjacent_cell->IsAMine){
+	    adjacent_cell->Pressed = false;
+		NonMinesLeft++;
+	  }
+	  if(adjacent_cell->MinesInArea == 0){
+		if(!flood_check(cord_queue, ql, {current_cords.x,current_cords.y - 1})){
+		  APPEND_QUEUE(cord_queue, ql, current_cords.x, current_cords.y - 1);
+		}
 	  }
 	}
-	if(current_cords.x != 8){
-	  MineGrid[current_cords.y][current_cords.x + 1].Pressed = true;
-	  if(MineGrid[current_cords.y][current_cords.x + 1].MinesInArea == 0){
-		cord_queue[ql].x = current_cords.x + 1;
-		cord_queue[ql].y = current_cords.y;
-		ql++;
+	if(current_cords.x < 8){
+	  adjacent_cell = &MineGrid[current_cords.y][current_cords.x + 1];
+	  adjacent_cell->Pressed = true;
+	  NonMinesLeft--;
+	  if (adjacent_cell->IsAMine){
+	    adjacent_cell->Pressed = false;
+		NonMinesLeft++;
+	  }
+	  if(adjacent_cell->MinesInArea == 0){
+		if(!flood_check(cord_queue, ql, {current_cords.x + 1,current_cords.y})){
+		  APPEND_QUEUE(cord_queue, ql, current_cords.x + 1, current_cords.y);
+		}
 	  }
 	}
-	if(current_cords.y != 8){
-	  MineGrid[current_cords.y + 1][current_cords.x].Pressed = true;
-	  if(MineGrid[current_cords.y + 1][current_cords.x].MinesInArea == 0){
-		cord_queue[ql].x = current_cords.x;
-		cord_queue[ql].y = current_cords.y + 1;
-		ql++;
+	if(current_cords.y < 8){
+	  adjacent_cell = &MineGrid[current_cords.y + 1][current_cords.x];
+	  adjacent_cell->Pressed = true;
+	  NonMinesLeft--;
+	   if (adjacent_cell->IsAMine){
+		 adjacent_cell->Pressed = false;
+		 NonMinesLeft++;
+	  }
+  	  
+	  if(adjacent_cell->MinesInArea == 0){
+		if(!flood_check(cord_queue, ql, {current_cords.x,current_cords.y + 1})){
+		  APPEND_QUEUE(cord_queue, ql, current_cords.x, current_cords.y + 1);
+		}
+	  }
+	}
+	if(current_cords.y && current_cords.x){
+	  adjacent_cell = &MineGrid[current_cords.y - 1][current_cords.x - 1];
+	  adjacent_cell->Pressed = true;
+	  NonMinesLeft--;
+	  if (adjacent_cell->IsAMine){
+		 adjacent_cell->Pressed = false;
+		 NonMinesLeft++;
+	  }
+  	  
+	  if(adjacent_cell->MinesInArea == 0){
+		if(!flood_check(cord_queue, ql, {current_cords.x-1,current_cords.y - 1})){
+		  APPEND_QUEUE(cord_queue, ql, current_cords.x - 1, current_cords.y - 1);
+		}
+	  }
+	}
+	if(current_cords.y < 8 && current_cords.x < 8){
+	  adjacent_cell = &MineGrid[current_cords.y + 1][current_cords.x + 1];
+	  adjacent_cell->Pressed = true;
+	  NonMinesLeft--;
+	  if (adjacent_cell->IsAMine){
+		 adjacent_cell->Pressed = false;
+		 NonMinesLeft++;
+	  }
+	  if(adjacent_cell->MinesInArea == 0){
+		if(!flood_check(cord_queue, ql, {current_cords.x+1,current_cords.y + 1})){
+		  APPEND_QUEUE(cord_queue, ql, current_cords.x+1, current_cords.y+1);
+		}
+	  }
+	}
+   	if(current_cords.y && current_cords.x < 8){
+	  adjacent_cell = &MineGrid[current_cords.y - 1][current_cords.x + 1];
+	  adjacent_cell->Pressed = true;
+	  NonMinesLeft--;
+	  if (adjacent_cell->IsAMine){
+	    adjacent_cell->Pressed = false;
+		NonMinesLeft++;
+	  }
 	  
+	  if(adjacent_cell->MinesInArea == 0){
+		if(!flood_check(cord_queue, ql, {current_cords.x+1,current_cords.y-1})){
+		  APPEND_QUEUE(cord_queue, ql, current_cords.x + 1, current_cords.y - 1);
+		}
+	  }
+	}
+	if(current_cords.y < 9 && current_cords.x){
+	  adjacent_cell = &MineGrid[current_cords.y + 1][current_cords.x - 1];
+	  adjacent_cell->Pressed = true;
+	  NonMinesLeft--;
+	  if (adjacent_cell->IsAMine){
+		adjacent_cell->Pressed = false;
+		NonMinesLeft++;
+	  }
+	 
+	 if(adjacent_cell->MinesInArea == 0){
+		if(!flood_check(cord_queue, ql, {current_cords.x - 1,current_cords.y + 1})){
+		  APPEND_QUEUE(cord_queue, ql, current_cords.x - 1, current_cords.y + 1);
+		}
+	  }
 	}
   }
-
+}
+// TODO : I plan on hashing this in the future
+// for now I am just brute forcing it until I come up with a decent hashing solution
+bool flood_check(Vector2I *queue, int ql, Vector2I cords) {
+  for (int i = 0; i < ql; i++) {
+    Vector2I comp_cord = queue[i];
+    if (cords.x == comp_cord.x && cords.y == comp_cord.y) {
+	  return true;
+    }
   }
+  return false;
 }
 
 void generate_random_mines(int in,int total_mines) {
