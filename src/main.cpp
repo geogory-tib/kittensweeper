@@ -9,6 +9,7 @@
 #define WINDOW_HEIGHT 486
 #define GRID_START 100
 #define APPEND_QUEUE(queue,ql,x,y) queue[ql] = {x,y}; ql++;
+#define GET_MINES (sizeof(MineGrid) / sizeof(Cell)) - 10;
 const Color BackGroundColor{
   .r = 192,
   .g = 192,
@@ -91,6 +92,7 @@ void calculate_mines_in_area(int in, int total_mines);
 
 void handle_resize();
 
+void update_mine_counter();
 
 int main(void) {
   init_mine_grid();
@@ -101,37 +103,38 @@ int main(void) {
   ClearBackground(BackGroundColor);
   render_game_state();
   EndDrawing();
-  for (; !WindowShouldClose();) {
+  for (; !WindowShouldClose() && !IsKeyPressed(KEY_Q);) {
 	BeginDrawing();
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
 	  Vector2 mouse_pos = GetMousePosition();
-	  if (!RestartButton.Dead && mouse_pos.y >= 100){
+	  if ((!RestartButton.Dead && !RestartButton.Won) && mouse_pos.y >= 100){
 		 int gridX = int((mouse_pos.x / SqaureSize.x));
 		 int gridY = int(((mouse_pos.y - 100) / SqaureSize.y));
-		 MineGrid[gridY][gridX].Pressed = true;
+		 Cell *clicked_cell = &MineGrid[gridY][gridX];
+		 if(!clicked_cell->Pressed)
+		 clicked_cell->Pressed = true;
 		 if (MineGrid[gridY][gridX].IsAMine) {
 		   RestartButton.Dead = true;
-		 }
-		 if(MineGrid[gridY][gridX].MinesInArea == 0){
+		 }else if(clicked_cell->MinesInArea == 0){
 		   flood_fill(gridX, gridY);
+		   update_mine_counter();
 		 }else{
 		   NonMinesLeft--;
 		 }
-	  }
-	  else if(mouse_pos.x <= (RestartButton.RestartRect.width + RestartButton.RestartRect.x) && mouse_pos.x >= (RestartButton.RestartRect.x)){
+	  }else if(mouse_pos.x <= (RestartButton.RestartRect.width + RestartButton.RestartRect.x) && mouse_pos.x >= (RestartButton.RestartRect.x)){
 		if(mouse_pos.y <= (RestartButton.RestartRect.y + RestartButton.RestartRect.height) && mouse_pos.y >= RestartButton.RestartRect.y){
 		  RestartButton.Pressed = true;
 		  init_mine_grid();
 		  RestartButton.Dead = false;
+		  RestartButton.Won = false;
 		}
 	  }
-	  //render_game_state(); // this was causing flickering on macos so i just have it render on each loop.
     }
-    if (IsKeyPressed(KEY_Q)) {
-	  break;
-    }
+	if(!NonMinesLeft){
+	  RestartButton.Won = true;
+	}
 	render_game_state();
-   EndDrawing();
+   	EndDrawing();
   }
   unload_assests();
   CloseWindow();
@@ -163,16 +166,16 @@ void render_game_state() {
                      Vector2{0.0, 0.0}, 0.0f, WHITE);
    }
 	 // debug for mine calculation
-	 char debug_buffer[40];
-	  if (current_cell.IsAMine) {
-		DrawText("M",(current_cell.postion.x),(current_cell.postion.y),20,RED);
-      } else {
-        snprintf(debug_buffer, sizeof(debug_buffer), "%d",
-                      current_cell.MinesInArea);
-		DrawText(debug_buffer,(current_cell.postion.x),(current_cell.postion.y),20,GREEN);
-      }
-	  snprintf(debug_buffer, sizeof(debug_buffer), "Non Mines Remaing%d",NonMinesLeft);
-	  DrawText(debug_buffer,0,0,20,RED);
+	 // char debug_buffer[40];
+	 //  if (current_cell.IsAMine) {
+	 // 	DrawText("M",(current_cell.postion.x),(current_cell.postion.y),20,RED);
+     //  } else {
+     //    snprintf(debug_buffer, sizeof(debug_buffer), "%d",
+     //                  current_cell.MinesInArea);
+	 // 	DrawText(debug_buffer,(current_cell.postion.x),(current_cell.postion.y),20,GREEN);
+     //  }
+	 //  snprintf(debug_buffer, sizeof(debug_buffer), "Non Mines Remaing%d",NonMinesLeft);
+	 //  DrawText(debug_buffer,0,0,20,RED);
     }
   }
 }
@@ -260,10 +263,8 @@ void flood_fill(int Sx, int Sy){
 	if(current_cords.x){
 	  adjacent_cell = &MineGrid[current_cords.y][current_cords.x - 1];
 	  adjacent_cell->Pressed = true;
-	  NonMinesLeft--;
-	  if (adjacent_cell->IsAMine){
+  	  if (adjacent_cell->IsAMine){
 	    adjacent_cell->Pressed = false;
-		NonMinesLeft--;
 	  }
 	  if(adjacent_cell->MinesInArea == 0){
 		if(!flood_check(cord_queue, ql, {current_cords.x-1,current_cords.y})){
@@ -274,10 +275,8 @@ void flood_fill(int Sx, int Sy){
 	if(current_cords.y){
 	  adjacent_cell = &MineGrid[current_cords.y - 1][current_cords.x];
 	  adjacent_cell->Pressed = true;
-	  NonMinesLeft--;
 	  if (adjacent_cell->IsAMine){
 	    adjacent_cell->Pressed = false;
-		NonMinesLeft++;
 	  }
 	  if(adjacent_cell->MinesInArea == 0){
 		if(!flood_check(cord_queue, ql, {current_cords.x,current_cords.y - 1})){
@@ -288,10 +287,8 @@ void flood_fill(int Sx, int Sy){
 	if(current_cords.x < 8){
 	  adjacent_cell = &MineGrid[current_cords.y][current_cords.x + 1];
 	  adjacent_cell->Pressed = true;
-	  NonMinesLeft--;
 	  if (adjacent_cell->IsAMine){
 	    adjacent_cell->Pressed = false;
-		NonMinesLeft++;
 	  }
 	  if(adjacent_cell->MinesInArea == 0){
 		if(!flood_check(cord_queue, ql, {current_cords.x + 1,current_cords.y})){
@@ -302,10 +299,8 @@ void flood_fill(int Sx, int Sy){
 	if(current_cords.y < 8){
 	  adjacent_cell = &MineGrid[current_cords.y + 1][current_cords.x];
 	  adjacent_cell->Pressed = true;
-	  NonMinesLeft--;
 	   if (adjacent_cell->IsAMine){
 		 adjacent_cell->Pressed = false;
-		 NonMinesLeft++;
 	  }
   	  
 	  if(adjacent_cell->MinesInArea == 0){
@@ -317,10 +312,8 @@ void flood_fill(int Sx, int Sy){
 	if(current_cords.y && current_cords.x){
 	  adjacent_cell = &MineGrid[current_cords.y - 1][current_cords.x - 1];
 	  adjacent_cell->Pressed = true;
-	  NonMinesLeft--;
 	  if (adjacent_cell->IsAMine){
 		 adjacent_cell->Pressed = false;
-		 NonMinesLeft++;
 	  }
   	  
 	  if(adjacent_cell->MinesInArea == 0){
@@ -332,10 +325,8 @@ void flood_fill(int Sx, int Sy){
 	if(current_cords.y < 8 && current_cords.x < 8){
 	  adjacent_cell = &MineGrid[current_cords.y + 1][current_cords.x + 1];
 	  adjacent_cell->Pressed = true;
-	  NonMinesLeft--;
 	  if (adjacent_cell->IsAMine){
 		 adjacent_cell->Pressed = false;
-		 NonMinesLeft++;
 	  }
 	  if(adjacent_cell->MinesInArea == 0){
 		if(!flood_check(cord_queue, ql, {current_cords.x+1,current_cords.y + 1})){
@@ -346,10 +337,8 @@ void flood_fill(int Sx, int Sy){
    	if(current_cords.y && current_cords.x < 8){
 	  adjacent_cell = &MineGrid[current_cords.y - 1][current_cords.x + 1];
 	  adjacent_cell->Pressed = true;
-	  NonMinesLeft--;
 	  if (adjacent_cell->IsAMine){
 	    adjacent_cell->Pressed = false;
-		NonMinesLeft++;
 	  }
 	  
 	  if(adjacent_cell->MinesInArea == 0){
@@ -361,10 +350,8 @@ void flood_fill(int Sx, int Sy){
 	if(current_cords.y < 9 && current_cords.x){
 	  adjacent_cell = &MineGrid[current_cords.y + 1][current_cords.x - 1];
 	  adjacent_cell->Pressed = true;
-	  NonMinesLeft--;
 	  if (adjacent_cell->IsAMine){
 		adjacent_cell->Pressed = false;
-		NonMinesLeft++;
 	  }
 	 
 	 if(adjacent_cell->MinesInArea == 0){
@@ -386,7 +373,17 @@ bool flood_check(Vector2I *queue, int ql, Vector2I cords) {
   }
   return false;
 }
-
+void update_mine_counter(){
+  int non_mines_remaining = 0;
+  for(int I = 0; I < 9;I++){
+	for(int i = 0;i < 9;i++){
+	  if(!MineGrid[I][i].Pressed && !MineGrid[I][i].IsAMine){
+		non_mines_remaining++;
+	  }
+	}
+  }
+  NonMinesLeft = non_mines_remaining;
+}
 void generate_random_mines(int in,int total_mines) {
   int counter = in;
   int RandRow = rand() % 9;
@@ -439,7 +436,7 @@ void calculate_mines_in_area() {
 void init_mine_grid() {
   int X = 0;
   int Y = GRID_START;
-  
+  NonMinesLeft = GET_MINES;
   for (int I = 0; I < 9; I++) {
     for (int i = 0; i < 9; i++) {
       MineGrid[I][i].postion = Vector2{.x = float(X), .y = float(Y)};
