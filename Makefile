@@ -1,5 +1,5 @@
 CXX = c++ 
-CXXFLAGS = -std=c++11 -Wall -Wextra -lm -L/opt/homebrew/lib -I/opt/homebrew/include/ -lraylib
+CXXFLAGS = -std=c++11 -Wall -Wextra -c -lm
 TARGET = KittenSweeper
 
 
@@ -9,7 +9,8 @@ all:  $(TARGET)
 $(TARGET):
 	$(CXX) $(CXXFLAGS) src/*.cpp -o $(TARGET)  
 debug:
-	$(CXX) $(CXXFLAGS) -ggdb src/*.cpp -o $(TARGET) 
+	$(CXX) $(CXXFLAGS) -ggdb src/*.cpp
+	$(CXX) -g  *.o libs/liblinray.a -o KittenSweeper
 clean:
-	rm KittenSweeper
+	rm src/*.o
 

@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <time.h>
-#include <raylib.h>
+#include "include/raylib.h"
 #include "include/gtd.h"
 #define WINDOW_WIDTH 486
 #define WINDOW_HEIGHT 486
@@ -56,9 +56,14 @@ Texture2D YellowCatDeadPressed;
 
 Texture2D YellowCatAlivePressed;
 
+Texture2D FlaggedCellTexture;
+
+Texture2D NumberAssests[8];
+
 struct Cell {
   bool IsAMine = false;
   bool Pressed = false;
+  bool Flagged = false;
   Vector2 postion;
   int MinesInArea;
 };
@@ -96,6 +101,7 @@ void update_mine_counter();
 
 int main(void) {
   init_mine_grid();
+  SetConfigFlags(FLAG_MSAA_4X_HINT);
   InitWindow(486, 586, "KittenSweeper! :3");
   SetTargetFPS(60);
   load_assests();
@@ -130,6 +136,14 @@ int main(void) {
 		}
 	  }
     }
+	if(IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)){
+	  Vector2 mouse_pos = GetMousePosition();
+	  if(!RestartButton.Dead && !RestartButton.Won && mouse_pos.y >= 100){
+		int gridX = int((mouse_pos.x / SqaureSize.x));
+		int gridY = int((mouse_pos.y - 100 / SqaureSize.y));
+		MineGrid[gridY][gridX].Flagged = true;
+	  }
+	}
 	if(!NonMinesLeft){
 	  RestartButton.Won = true;
 	}
@@ -162,8 +176,11 @@ void render_game_state() {
 	 if (current_cell.Pressed){
 	  handle_cell_texture(current_cell,TextureSource,concated_shape);
     } else {
-      DrawTexturePro(DefaultBoxTexture, TextureSource, concated_shape,
-                     Vector2{0.0, 0.0}, 0.0f, WHITE);
+	   if(!current_cell.Flagged){
+		 DrawTexturePro(DefaultBoxTexture, TextureSource, concated_shape, Vector2{0.0, 0.0}, 0.0f, WHITE);
+	   }else{
+		 DrawTexturePro(FlaggedCellTexture,TextureSource,concated_shape,Vector2{0.0,0.0},0.0f,WHITE);
+	   }
    }
 	 // debug for mine calculation
 	 // char debug_buffer[40];
@@ -191,12 +208,18 @@ inline void handle_cell_texture(Cell current_cell,Rectangle TextureSource,Rectan
                    Vector2{0.0, 0.0}, 0.0f, WHITE);
 	return;
   }
-  // TODO alssya is working on custom number assests for me. For now I'm just
-  // going to print the number as text for now
-  DrawTexturePro(PressedBoxTexture, TextureSource, concated_shape,
-                 Vector2{0.0, 0.0}, 0.0f, WHITE);
-  snprintf(NumberBuffer, sizeof(NumberBuffer), "%d", current_cell.MinesInArea);
-  DrawText(NumberBuffer,concated_shape.x + (concated_shape.width / 2),concated_shape.y + (concated_shape.height / 2),20,RED);
+  if(!current_cell.MinesInArea){
+	DrawTexturePro(PressedBoxTexture,TextureSource,concated_shape,Vector2{0.0f,0.0f},0.0f,WHITE);
+	return;
+  }
+  Rectangle NumberTextureSource{
+	.x = 0,
+	.y = 0,
+	.width = float(NumberAssests[current_cell.MinesInArea - 1].width),
+	.height = float(NumberAssests[current_cell.MinesInArea - 1].height),
+  };
+  DrawTexturePro(NumberAssests[current_cell.MinesInArea - 1], NumberTextureSource, concated_shape, Vector2{0.0, 0.0}, 0.0f, WHITE);
+
 }
 inline void render_restart_button() {
     const Rectangle RestartButtonSource{
@@ -229,8 +252,8 @@ inline void render_restart_button() {
 	
 	
 }
-// in the future this will have to load a larger amount of assests
 void load_assests() {
+  char  number_path_buffer[200];
   DefaultBoxTexture = LoadTexture("./src/assests/defaultunpressed.png");
   PressedBoxTexture = LoadTexture("./src/assests/defaultpressed.png");
   EvilMineCat = LoadTexture("./src/assests/evilcatpressed.png");
@@ -238,6 +261,11 @@ void load_assests() {
   YellowCatAlivePressed = LoadTexture("./src/assests/yellowcatpr.png");
   YellowCatDead = LoadTexture("./src/assests/deadyellowcat.png");
   YellowCatWon = LoadTexture("./src/assests/coolyellowcatun.png");
+  FlaggedCellTexture = LoadTexture("./src/assests/evilcatcrossed.png");
+  for(int i = 0; i < 8;i++){
+	snprintf(number_path_buffer,sizeof(number_path_buffer),"./src/assests/%d.png",i + 1);
+	NumberAssests[i] = LoadTexture(number_path_buffer);
+  }
 }
 void unload_assests() {
   UnloadTexture(DefaultBoxTexture);
@@ -246,6 +274,9 @@ void unload_assests() {
   UnloadTexture(YellowCatAlive);
   UnloadTexture(YellowCatAlivePressed);
   UnloadTexture(YellowCatDead);
+  for(int i = 0;i < 8;i++){
+	UnloadTexture(NumberAssests[i]);
+  }
 }
 
 
