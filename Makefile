@@ -1,4 +1,4 @@
-CXX = c++ 
+CXX = g++ 
 CXXFLAGS = -std=c++11 -Wall -Wextra -c -lm
 TARGET = KittenSweeper
 

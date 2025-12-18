@@ -71,8 +71,9 @@ struct Cell {
 
 
 // can be scaled in the future for now just assume 9x9 grid
-Cell MineGrid[9][9];
-
+Cell MineGrid[9*9];
+int GridRows = 9;
+int GridCols = 9;
 int NonMinesLeft = (sizeof(MineGrid) / sizeof(Cell)) - 10;
 
 inline void render_restart_button();
@@ -99,6 +100,8 @@ void handle_resize();
 
 void update_mine_counter();
 
+Cell *get_cell(int x,int y);
+
 int main(void) {
   init_mine_grid();
   SetConfigFlags(FLAG_MSAA_4X_HINT);
@@ -116,10 +119,10 @@ int main(void) {
 	  if ((!RestartButton.Dead && !RestartButton.Won) && mouse_pos.y >= 100){
 		 int gridX = int((mouse_pos.x / SqaureSize.x));
 		 int gridY = int(((mouse_pos.y - 100) / SqaureSize.y));
-		 Cell *clicked_cell = &MineGrid[gridY][gridX];
+		 Cell *clicked_cell = get_cell(gridX,gridY);
 		 if(!clicked_cell->Pressed)
 		 clicked_cell->Pressed = true;
-		 if (MineGrid[gridY][gridX].IsAMine) {
+		 if (clicked_cell->IsAMine){
 		   RestartButton.Dead = true;
 		 }else if(clicked_cell->MinesInArea == 0){
 		   flood_fill(gridX, gridY);
@@ -141,7 +144,7 @@ int main(void) {
 	  if(!RestartButton.Dead && !RestartButton.Won && mouse_pos.y >= 100){
 		int gridX = int((mouse_pos.x / SqaureSize.x));
 		int gridY = int((mouse_pos.y - 100 / SqaureSize.y));
-		MineGrid[gridY][gridX].Flagged = true;
+		get_cell(gridX, gridY)->Flagged = true;
 	  }
 	}
 	if(!NonMinesLeft){
@@ -166,7 +169,7 @@ void render_game_state() {
   render_restart_button();
   for (int I = 0; I < 9; I++) {
     for (int i = 0; i < 9; i++) {
-	  Cell current_cell = MineGrid[I][i];
+	  Cell current_cell = *get_cell(i, I);
           Rectangle concated_shape = {
               .x = current_cell.postion.x,
               .y = current_cell.postion.y,
@@ -292,7 +295,7 @@ void flood_fill(int Sx, int Sy){
 	Cell *adjacent_cell;
 	
 	if(current_cords.x){
-	  adjacent_cell = &MineGrid[current_cords.y][current_cords.x - 1];
+	  adjacent_cell = get_cell(current_cords.x - 1, current_cords.y);
 	  adjacent_cell->Pressed = true;
   	  if (adjacent_cell->IsAMine){
 	    adjacent_cell->Pressed = false;
@@ -304,7 +307,7 @@ void flood_fill(int Sx, int Sy){
 	  }
 	}
 	if(current_cords.y){
-	  adjacent_cell = &MineGrid[current_cords.y - 1][current_cords.x];
+	  adjacent_cell = get_cell(current_cords.x, current_cords.y - 1);
 	  adjacent_cell->Pressed = true;
 	  if (adjacent_cell->IsAMine){
 	    adjacent_cell->Pressed = false;
@@ -316,7 +319,7 @@ void flood_fill(int Sx, int Sy){
 	  }
 	}
 	if(current_cords.x < 8){
-	  adjacent_cell = &MineGrid[current_cords.y][current_cords.x + 1];
+	  adjacent_cell = get_cell(current_cords.x + 1, current_cords.y);
 	  adjacent_cell->Pressed = true;
 	  if (adjacent_cell->IsAMine){
 	    adjacent_cell->Pressed = false;
@@ -328,7 +331,7 @@ void flood_fill(int Sx, int Sy){
 	  }
 	}
 	if(current_cords.y < 8){
-	  adjacent_cell = &MineGrid[current_cords.y + 1][current_cords.x];
+	  adjacent_cell = get_cell(current_cords.x, current_cords.y + 1);
 	  adjacent_cell->Pressed = true;
 	   if (adjacent_cell->IsAMine){
 		 adjacent_cell->Pressed = false;
@@ -341,7 +344,7 @@ void flood_fill(int Sx, int Sy){
 	  }
 	}
 	if(current_cords.y && current_cords.x){
-	  adjacent_cell = &MineGrid[current_cords.y - 1][current_cords.x - 1];
+	  adjacent_cell = get_cell(current_cords.x - 1, current_cords.y - 1);
 	  adjacent_cell->Pressed = true;
 	  if (adjacent_cell->IsAMine){
 		 adjacent_cell->Pressed = false;
@@ -354,7 +357,7 @@ void flood_fill(int Sx, int Sy){
 	  }
 	}
 	if(current_cords.y < 8 && current_cords.x < 8){
-	  adjacent_cell = &MineGrid[current_cords.y + 1][current_cords.x + 1];
+	  adjacent_cell = get_cell(current_cords.x+1, current_cords.y + 1);
 	  adjacent_cell->Pressed = true;
 	  if (adjacent_cell->IsAMine){
 		 adjacent_cell->Pressed = false;
@@ -366,7 +369,7 @@ void flood_fill(int Sx, int Sy){
 	  }
 	}
    	if(current_cords.y && current_cords.x < 8){
-	  adjacent_cell = &MineGrid[current_cords.y - 1][current_cords.x + 1];
+	  adjacent_cell = get_cell(current_cords.x + 1, current_cords.y- 1);
 	  adjacent_cell->Pressed = true;
 	  if (adjacent_cell->IsAMine){
 	    adjacent_cell->Pressed = false;
@@ -379,7 +382,7 @@ void flood_fill(int Sx, int Sy){
 	  }
 	}
 	if(current_cords.y < 9 && current_cords.x){
-	  adjacent_cell = &MineGrid[current_cords.y + 1][current_cords.x - 1];
+	  adjacent_cell = get_cell(current_cords.x-1, current_cords.y + 1);
 	  adjacent_cell->Pressed = true;
 	  if (adjacent_cell->IsAMine){
 		adjacent_cell->Pressed = false;
@@ -408,7 +411,7 @@ void update_mine_counter(){
   int non_mines_remaining = 0;
   for(int I = 0; I < 9;I++){
 	for(int i = 0;i < 9;i++){
-	  if(!MineGrid[I][i].Pressed && !MineGrid[I][i].IsAMine){
+	  if(!get_cell(i, I)->Pressed && !get_cell(i, I)->IsAMine){
 		non_mines_remaining++;
 	  }
 	}
@@ -419,47 +422,52 @@ void generate_random_mines(int in,int total_mines) {
   int counter = in;
   int RandRow = rand() % 9;
   int RandCol = rand() % 9;
-  if (MineGrid[RandRow][RandCol].IsAMine) {
+  if (get_cell(RandCol, RandRow)->IsAMine) {
 	return generate_random_mines(counter,total_mines);
   }
-  MineGrid[RandRow][RandCol].IsAMine = true;
+  get_cell(RandCol, RandRow)->IsAMine = true;
   counter++;
   if (counter < total_mines) {
 	return generate_random_mines(counter,total_mines);
   }
   return;
 }
+Cell *get_cell(int x,int y){
+  int row = y * GridCols;
+  int pos = row + x;
+  return &MineGrid[pos];
+}
 // I could of probably done this better -- i did end up doing it better
 void calculate_mines_in_area() {
   for (int I = 0; I < 9; I++) {
     for (int i = 0; i < 9; i++) {
-      Cell current_cell = MineGrid[I][i];
-	  if(!current_cell.IsAMine){
+      Cell *current_cell = get_cell(i, I);
+	  if(!current_cell->IsAMine){
 		continue;
 	  }
 	 if(I){
-	   MineGrid[I-1][i].MinesInArea++;
+	   get_cell(i, I - 1)->MinesInArea++;
 	 }
 	 if(i){
-	   MineGrid[I][i - 1].MinesInArea++;  
+	   get_cell(i-1, I)->MinesInArea++;  
 	 }
 	 if(I != 8){
-	   MineGrid[I+1][i].MinesInArea++;
+	   get_cell(i, I + 1)->MinesInArea++;
 	 }
 	 if(i != 8){
-	   MineGrid[I][i+1].MinesInArea++; 
+	   get_cell(i+1, I)->MinesInArea++; 
 	 }
 	 if(I && i){
-	   MineGrid[I-1][i-1].MinesInArea++;
+	   get_cell(i-1,I-1)->MinesInArea++;
 	 }
 	 if(I != 8 && i != 8){
-	   MineGrid[I+1][i+1].MinesInArea++;
+	 get_cell(i+1, I+1)->MinesInArea++;
 	 }
 	 if(I != 8 && i){
-	   MineGrid[I + 1][i-1].MinesInArea++;
+	  get_cell(i-1, I+1)->MinesInArea++;
 	 }
 	 if(I && i != 8){
-	   MineGrid[I - 1][i + 1].MinesInArea++;
+	   get_cell(i+1, I-1)->MinesInArea++;
 	 }
  	}
   }
@@ -470,10 +478,10 @@ void init_mine_grid() {
   NonMinesLeft = GET_MINES;
   for (int I = 0; I < 9; I++) {
     for (int i = 0; i < 9; i++) {
-      MineGrid[I][i].postion = Vector2{.x = float(X), .y = float(Y)};
-	  MineGrid[I][i].Pressed = false;
-	  MineGrid[I][i].IsAMine = false;
-	  MineGrid[I][i].MinesInArea = 0;
+      get_cell(i, I)->postion = Vector2{.x = float(X), .y = float(Y)};
+	  get_cell(i, I)->Pressed = false;
+	  get_cell(i, I)->IsAMine = false;
+	  get_cell(i, I)->MinesInArea = 0;
 	  X += SqaureSize.x;
     }
     X = 0;
