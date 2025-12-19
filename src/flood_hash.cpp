@@ -45,8 +45,8 @@ void hash_add(Vector2I cords,flood_hashmap *map){
 		return;
 	  }
 	}
-	map->buffer[index].cord = cords;
   }
+  map->buffer[index].cord = cords;
 }
 
 bool hash_look(Vector2I cords,flood_hashmap *map){

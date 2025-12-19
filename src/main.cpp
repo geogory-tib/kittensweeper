@@ -320,8 +320,7 @@ void flood_fill(int Sx, int Sy){
   hash_add(cord_queue[0],&map);
   for(;qp < ql;qp++){
 	Vector2I current_cords = cord_queue[qp];
-	Cell *adjacent_cell;
-	
+	Cell *adjacent_cell;	
 	if(current_cords.x){
 	  adjacent_cell = get_cell(current_cords.x - 1, current_cords.y);
 	  adjacent_cell->Pressed = true;
@@ -329,8 +328,9 @@ void flood_fill(int Sx, int Sy){
 	    adjacent_cell->Pressed = false;
 	  }
 	  if(adjacent_cell->MinesInArea == 0){
-		if(!flood_check(cord_queue,ql,{current_cords.x-1,current_cords.y})){
+		if(!hash_look({current_cords.x - 1, current_cords.y}, &map)){
 		  APPEND_QUEUE(cord_queue, ql, current_cords.x - 1, current_cords.y);
+		  hash_add({current_cords.x - 1,current_cords.y},&map);
 		}
 	  }
 	}
@@ -341,8 +341,9 @@ void flood_fill(int Sx, int Sy){
 	    adjacent_cell->Pressed = false;
 	  }
 	  if(adjacent_cell->MinesInArea == 0){
-		if(!flood_check(cord_queue, ql, {current_cords.x,current_cords.y - 1})){
+		if(!hash_look({current_cords.x,current_cords.y-1}, &map)){
 		  APPEND_QUEUE(cord_queue, ql, current_cords.x, current_cords.y - 1);
+		  hash_add({current_cords.x,current_cords.y}, &map);
 		}
 	  }
 	}
@@ -353,8 +354,9 @@ void flood_fill(int Sx, int Sy){
 	    adjacent_cell->Pressed = false;
 	  }
 	  if(adjacent_cell->MinesInArea == 0){
-		if(!flood_check(cord_queue, ql, {current_cords.x + 1,current_cords.y})){
+		if(!hash_look({current_cords.x + 1,current_cords.y}, &map)){
 		  APPEND_QUEUE(cord_queue, ql, current_cords.x + 1, current_cords.y);
+		  hash_add({current_cords.x + 1,current_cords.y}, &map);
 		}
 	  }
 	}
@@ -366,8 +368,9 @@ void flood_fill(int Sx, int Sy){
 	  }
   	  
 	  if(adjacent_cell->MinesInArea == 0){
-		if(!flood_check(cord_queue, ql, {current_cords.x,current_cords.y + 1})){
+		if(!hash_look({current_cords.x,current_cords.y + 1}, &map)){
 		  APPEND_QUEUE(cord_queue, ql, current_cords.x, current_cords.y + 1);
+		  hash_add({current_cords.x,current_cords.y + 1}, &map);
 		}
 	  }
 	}
@@ -379,8 +382,9 @@ void flood_fill(int Sx, int Sy){
 	  }
   	  
 	  if(adjacent_cell->MinesInArea == 0){
-		if(!flood_check(cord_queue, ql, {current_cords.x-1,current_cords.y - 1})){
+		if(!hash_look({current_cords.x - 1,current_cords.y - 1}, &map)){
 		  APPEND_QUEUE(cord_queue, ql, current_cords.x - 1, current_cords.y - 1);
+		  hash_add({current_cords.x - 1,current_cords.y - 1}, &map);
 		}
 	  }
 	}
@@ -391,8 +395,9 @@ void flood_fill(int Sx, int Sy){
 		 adjacent_cell->Pressed = false;
 	  }
 	  if(adjacent_cell->MinesInArea == 0){
-		if(!flood_check(cord_queue, ql, {current_cords.x+1,current_cords.y + 1})){
+		if(!hash_look({current_cords.x + 1,current_cords.y + 1}, &map)){
 		  APPEND_QUEUE(cord_queue, ql, current_cords.x+1, current_cords.y+1);
+		  hash_add({current_cords.x + 1, current_cords.y + 1}, &map);
 		}
 	  }
 	}
@@ -404,26 +409,28 @@ void flood_fill(int Sx, int Sy){
 	  }
 	  
 	  if(adjacent_cell->MinesInArea == 0){
-		if(!flood_check(cord_queue, ql, {current_cords.x+1,current_cords.y-1})){
+		if(!hash_look({current_cords.x + 1,current_cords.y - 1}, &map)){
 		  APPEND_QUEUE(cord_queue, ql, current_cords.x + 1, current_cords.y - 1);
+		  hash_add({current_cords.x + 1,current_cords.y - 1}, &map);
+		  }
+	  }
+	  if(current_cords.y < GridRows - 1 && current_cords.x){
+		adjacent_cell = get_cell(current_cords.x-1, current_cords.y + 1);
+		adjacent_cell->Pressed = true;
+		if (adjacent_cell->IsAMine){
+		  adjacent_cell->Pressed = false;
 		}
-	  }
-	}
-	if(current_cords.y < GridRows - 1 && current_cords.x){
-	  adjacent_cell = get_cell(current_cords.x-1, current_cords.y + 1);
-	  adjacent_cell->Pressed = true;
-	  if (adjacent_cell->IsAMine){
-		adjacent_cell->Pressed = false;
-	  }
-	 
 	 if(adjacent_cell->MinesInArea == 0){
-		if(!flood_check(cord_queue, ql, {current_cords.x - 1,current_cords.y + 1})){
+	   if(!hash_look({current_cords.x - 1, current_cords.y + 1}, &map)){
 		  APPEND_QUEUE(cord_queue, ql, current_cords.x - 1, current_cords.y + 1);
+		  hash_add({current_cords.x -1, current_cords.y + 1}, &map);
 		}
 	  }
 	}
+   }
   }
-  free(cord_queue);
+  	destroy_flood_map(&map);
+	free(cord_queue);
 }
 // TODO : I plan on hashing this in the future
 // for now I am just brute forcing it until I come up with a decent hashing solution
