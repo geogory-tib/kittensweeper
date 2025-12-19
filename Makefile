@@ -12,5 +12,5 @@ debug:
 	$(CXX) $(CXXFLAGS) -ggdb src/*.cpp
 	$(CXX) -g  *.o libs/liblinray.a -o KittenSweeper
 clean:
-	rm src/*.o
+	rm *.o
 

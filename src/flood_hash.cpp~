@@ -1,0 +1,66 @@
+#include <cstdlib>
+
+struct Vector2I{
+  int x,y;
+  bool operator==(Vector2I other){
+	return (this->x == other.x && this.y == other.y);
+  }
+};
+
+struct hash_bucket{
+  bool occuiped = false;
+  Vector2I cord;
+};
+
+struct flood_hashmap{
+  hash_bucket *buffer;
+  int cap;
+};
+
+flood_hashmap create_flood_map(int cap){
+  flood_hashmap ret;
+  ret.buffer = (hash_bucket *)calloc(cap,sizeof(hash_bucket));
+  ret.cap = cap;
+  ret.occ = 0;
+  return ret;
+}
+
+void destroy_flood_map(flood_hashmap *map){
+  free(map->buffer);
+  map->cap = -1;
+  map->occ = -1;
+}
+
+long long hash_func(Vector2I cords){
+  long long hash = (cords.x << 32) | cords.x;
+  return hash;
+}
+
+void hash_add(Vector2I cords,flood_hashmap *map){
+  int index = hash_func(cords) % map->cap;
+  if(map->buffer[index].occuiped){
+	for(;;){
+	  index = (index + 1) % cap;
+	  if(!map->buffer.occuiped){
+		return;
+	  }
+	}
+	map->buffer[index].cord = cords;
+  }
+}
+
+bool hash_look(Vector2I cords,flood_hashmap *map){
+  int index = hash_func(cords) % map->cap;
+  if(map->buffer[index].cord == cords){
+	return true;
+  }
+  for(;;){
+	index = (index + 1) % cap;
+	if(map->buffer[index].cord == cords){
+	  return true;
+	}else if(!map->buffer[index].occuiped){
+	  break;
+	}
+  }
+  return false;
+}

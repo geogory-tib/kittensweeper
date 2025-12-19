@@ -5,11 +5,31 @@
 #include <time.h>
 #include "include/raylib.h"
 #include "include/gtd.h"
+#include "include/flood_hash.h"
 #define WINDOW_WIDTH 486
-#define WINDOW_HEIGHT 486
+
+#define WINDOW_HEIGH 586
+
+#define GRID_WIDTH 486
+
+#define GRID_HEIGHT 486
+
 #define GRID_START 100
+
 #define APPEND_QUEUE(queue,ql,x,y) queue[ql] = {x,y}; ql++;
-#define GET_MINES (sizeof(MineGrid) / sizeof(Cell)) - 10;
+
+#define BEGIN_MODE 0
+
+#define BEGIN_MINE 10
+
+#define INTER_MODE 1
+
+#define INTER_MINE 40
+
+#define EXPERT_MODE 2
+
+#define EXPERT_MINE 99
+
 const Color BackGroundColor{
   .r = 192,
   .g = 192,
@@ -17,10 +37,8 @@ const Color BackGroundColor{
   .a = 255,
 };
 
-Vector2 SqaureSize{
-    .x = 54,
-    .y = 54,
-};
+Vector2 SqaureSize;
+
 struct RestartButton_t {
   Rectangle RestartRect{
       .x = (WINDOW_WIDTH / 2.0f) - (67.5 / 2.0f),
@@ -32,13 +50,10 @@ struct RestartButton_t {
   bool Dead = false; // this is the game over con
   bool Won = false;
 };
-struct Vector2I{
-  int x,y;
-};
+
+
 
 RestartButton_t RestartButton;
-// used for the snpritnf
-char NumberBuffer[4];
 
 Texture2D DefaultBoxTexture;
 
@@ -71,14 +86,16 @@ struct Cell {
 
 
 // can be scaled in the future for now just assume 9x9 grid
-Cell MineGrid[9*9];
+int GameDif = BEGIN_MODE;
+Cell *MineGrid;
 int GridRows = 9;
 int GridCols = 9;
-int NonMinesLeft = (sizeof(MineGrid) / sizeof(Cell)) - 10;
+int TotalMines;
+int NonMinesLeft;
 
 inline void render_restart_button();
 
-void generate_random_mines();
+void generate_random_mines(int in,int total_mines,Vector2I *mine_array);
 
 void flood_fill(int Sx, int Sy);
 
@@ -94,13 +111,15 @@ void unload_assests();
 
 void render_game_state();
 
-void calculate_mines_in_area(int in, int total_mines);
+void calculate_mines_in_area(Vector2I *mine_array);
 
 void handle_resize();
 
 void update_mine_counter();
 
 Cell *get_cell(int x,int y);
+
+void get_mine_size();
 
 int main(void) {
   init_mine_grid();
@@ -143,8 +162,9 @@ int main(void) {
 	  Vector2 mouse_pos = GetMousePosition();
 	  if(!RestartButton.Dead && !RestartButton.Won && mouse_pos.y >= 100){
 		int gridX = int((mouse_pos.x / SqaureSize.x));
-		int gridY = int((mouse_pos.y - 100 / SqaureSize.y));
+		int gridY = int(((mouse_pos.y - 100) / SqaureSize.y));
 		get_cell(gridX, gridY)->Flagged = true;
+		
 	  }
 	}
 	if(!NonMinesLeft){
@@ -166,9 +186,15 @@ void render_game_state() {
       .width = float(DefaultBoxTexture.width),
       .height = float(DefaultBoxTexture.height),
   };
+  const Rectangle FlaggedTextureSource{
+	.x = 0,
+	.y = 0,
+	.width = float(FlaggedCellTexture.width),
+	.height = float(FlaggedCellTexture.height),
+  };
   render_restart_button();
-  for (int I = 0; I < 9; I++) {
-    for (int i = 0; i < 9; i++) {
+  for (int I = 0; I < GridRows; I++) {
+    for (int i = 0; i < GridCols; i++) {
 	  Cell current_cell = *get_cell(i, I);
           Rectangle concated_shape = {
               .x = current_cell.postion.x,
@@ -179,13 +205,14 @@ void render_game_state() {
 	 if (current_cell.Pressed){
 	  handle_cell_texture(current_cell,TextureSource,concated_shape);
     } else {
-	   if(!current_cell.Flagged){
-		 DrawTexturePro(DefaultBoxTexture, TextureSource, concated_shape, Vector2{0.0, 0.0}, 0.0f, WHITE);
+	   if(current_cell.Flagged){
+		DrawTexturePro(FlaggedCellTexture,FlaggedTextureSource,concated_shape,Vector2{0.0,0.0},0.0f,WHITE);
 	   }else{
-		 DrawTexturePro(FlaggedCellTexture,TextureSource,concated_shape,Vector2{0.0,0.0},0.0f,WHITE);
+		 DrawTexturePro(DefaultBoxTexture, TextureSource, concated_shape, Vector2{0.0, 0.0}, 0.0f, WHITE);
 	   }
+	   
    }
-	 // debug for mine calculation
+	 // debug printing for mine board
 	 // char debug_buffer[40];
 	 //  if (current_cell.IsAMine) {
 	 // 	DrawText("M",(current_cell.postion.x),(current_cell.postion.y),20,RED);
@@ -284,12 +311,13 @@ void unload_assests() {
 
 
 void flood_fill(int Sx, int Sy){
-  Vector2I cord_queue[61];
+  Vector2I *cord_queue = (Vector2I *)calloc(((GridCols * GridRows) - TotalMines),sizeof(*cord_queue));
+  flood_hashmap map = create_flood_map((GridCols * GridRows) + 10);
   int qp = 0;
   int ql = 1;
   cord_queue[0].x = Sx;
   cord_queue[0].y = Sy;
-  
+  hash_add(cord_queue[0],&map);
   for(;qp < ql;qp++){
 	Vector2I current_cords = cord_queue[qp];
 	Cell *adjacent_cell;
@@ -301,7 +329,7 @@ void flood_fill(int Sx, int Sy){
 	    adjacent_cell->Pressed = false;
 	  }
 	  if(adjacent_cell->MinesInArea == 0){
-		if(!flood_check(cord_queue, ql, {current_cords.x-1,current_cords.y})){
+		if(!flood_check(cord_queue,ql,{current_cords.x-1,current_cords.y})){
 		  APPEND_QUEUE(cord_queue, ql, current_cords.x - 1, current_cords.y);
 		}
 	  }
@@ -318,7 +346,7 @@ void flood_fill(int Sx, int Sy){
 		}
 	  }
 	}
-	if(current_cords.x < 8){
+	if(current_cords.x < GridRows - 1){
 	  adjacent_cell = get_cell(current_cords.x + 1, current_cords.y);
 	  adjacent_cell->Pressed = true;
 	  if (adjacent_cell->IsAMine){
@@ -330,7 +358,7 @@ void flood_fill(int Sx, int Sy){
 		}
 	  }
 	}
-	if(current_cords.y < 8){
+	if(current_cords.y < GridRows - 1){
 	  adjacent_cell = get_cell(current_cords.x, current_cords.y + 1);
 	  adjacent_cell->Pressed = true;
 	   if (adjacent_cell->IsAMine){
@@ -356,7 +384,7 @@ void flood_fill(int Sx, int Sy){
 		}
 	  }
 	}
-	if(current_cords.y < 8 && current_cords.x < 8){
+	if(current_cords.y < GridRows - 1&& current_cords.x < GridCols - 1){
 	  adjacent_cell = get_cell(current_cords.x+1, current_cords.y + 1);
 	  adjacent_cell->Pressed = true;
 	  if (adjacent_cell->IsAMine){
@@ -368,7 +396,7 @@ void flood_fill(int Sx, int Sy){
 		}
 	  }
 	}
-   	if(current_cords.y && current_cords.x < 8){
+   	if(current_cords.y && current_cords.x < GridCols - 1){
 	  adjacent_cell = get_cell(current_cords.x + 1, current_cords.y- 1);
 	  adjacent_cell->Pressed = true;
 	  if (adjacent_cell->IsAMine){
@@ -381,7 +409,7 @@ void flood_fill(int Sx, int Sy){
 		}
 	  }
 	}
-	if(current_cords.y < 9 && current_cords.x){
+	if(current_cords.y < GridRows - 1 && current_cords.x){
 	  adjacent_cell = get_cell(current_cords.x-1, current_cords.y + 1);
 	  adjacent_cell->Pressed = true;
 	  if (adjacent_cell->IsAMine){
@@ -395,6 +423,7 @@ void flood_fill(int Sx, int Sy){
 	  }
 	}
   }
+  free(cord_queue);
 }
 // TODO : I plan on hashing this in the future
 // for now I am just brute forcing it until I come up with a decent hashing solution
@@ -418,17 +447,18 @@ void update_mine_counter(){
   }
   NonMinesLeft = non_mines_remaining;
 }
-void generate_random_mines(int in,int total_mines) {
+void generate_random_mines(int in,int total_mines,Vector2I *mine_array) {
   int counter = in;
   int RandRow = rand() % 9;
   int RandCol = rand() % 9;
   if (get_cell(RandCol, RandRow)->IsAMine) {
-	return generate_random_mines(counter,total_mines);
+	return generate_random_mines(counter,total_mines,mine_array);
   }
   get_cell(RandCol, RandRow)->IsAMine = true;
+  mine_array[counter] = {RandCol,RandRow};
   counter++;
   if (counter < total_mines) {
-	return generate_random_mines(counter,total_mines);
+	return generate_random_mines(counter,total_mines,mine_array);
   }
   return;
 }
@@ -438,44 +468,58 @@ Cell *get_cell(int x,int y){
   return &MineGrid[pos];
 }
 // I could of probably done this better -- i did end up doing it better
-void calculate_mines_in_area() {
-  for (int I = 0; I < 9; I++) {
-    for (int i = 0; i < 9; i++) {
-      Cell *current_cell = get_cell(i, I);
-	  if(!current_cell->IsAMine){
-		continue;
-	  }
-	 if(I){
-	   get_cell(i, I - 1)->MinesInArea++;
-	 }
-	 if(i){
-	   get_cell(i-1, I)->MinesInArea++;  
-	 }
-	 if(I != 8){
-	   get_cell(i, I + 1)->MinesInArea++;
-	 }
-	 if(i != 8){
-	   get_cell(i+1, I)->MinesInArea++; 
-	 }
-	 if(I && i){
-	   get_cell(i-1,I-1)->MinesInArea++;
-	 }
-	 if(I != 8 && i != 8){
-	 get_cell(i+1, I+1)->MinesInArea++;
-	 }
-	 if(I != 8 && i){
-	  get_cell(i-1, I+1)->MinesInArea++;
-	 }
-	 if(I && i != 8){
-	   get_cell(i+1, I-1)->MinesInArea++;
-	 }
- 	}
+void calculate_mines_in_area(Vector2I *mine_array) {
+  for (int i = 0;i < TotalMines;i++) {
+	Vector2I current_cords = mine_array[i];
+	if(current_cords.x){
+	   get_cell(current_cords.x - 1,current_cords.y)->MinesInArea++;
+	}
+	if(current_cords.y){
+	  get_cell(current_cords.x,current_cords.y - 1)->MinesInArea++;  
+	}
+	if(current_cords.x < GridCols - 1){
+	  get_cell(current_cords.x + 1,current_cords.y)->MinesInArea++;
+	}
+	if(current_cords.y < GridRows - 1){
+	  get_cell(current_cords.x,current_cords.y + 1)->MinesInArea++; 
+	}
+	if(current_cords.x && current_cords.y){
+	   get_cell(current_cords.x - 1,current_cords.y - 1)->MinesInArea++;
+	}
+	if(current_cords.x < GridCols - 1 && current_cords.y < GridRows - 1){
+	  get_cell(current_cords.x + 1,current_cords.y + 1)->MinesInArea++;
+	}
+	if(current_cords.x && current_cords.y < GridRows - 1){
+	  get_cell(current_cords.x - 1,current_cords.y + 1)->MinesInArea++;
+	}
+	if(current_cords.x < GridCols - 1 && current_cords.y){
+	  get_cell(current_cords.x + 1, current_cords.y - 1)->MinesInArea++;
+	}	
   }
+}
+void get_mine_size(){
+  if(GameDif == BEGIN_MODE){
+	GridCols = 9;
+	GridRows = 9;
+	TotalMines = BEGIN_MINE;
+  }else if( GameDif == INTER_MODE){
+	GridCols = 16;
+	GridRows = 16;
+	TotalMines = INTER_MINE;
+  }else if(GameDif == EXPERT_MODE){
+	GridCols = 30;
+	GridRows = 16;
+	TotalMines = EXPERT_MINE;
+  }
+  SqaureSize.x = float(GRID_WIDTH) / float(GridCols);
+  SqaureSize.y = float(GRID_HEIGHT) / float(GridRows);
 }
 void init_mine_grid() {
   int X = 0;
   int Y = GRID_START;
-  NonMinesLeft = GET_MINES;
+  get_mine_size();
+  MineGrid = (Cell*)calloc(GridCols * GridRows,sizeof(*MineGrid));
+  NonMinesLeft = (GridCols * GridRows) - TotalMines;
   for (int I = 0; I < 9; I++) {
     for (int i = 0; i < 9; i++) {
       get_cell(i, I)->postion = Vector2{.x = float(X), .y = float(Y)};
@@ -488,6 +532,8 @@ void init_mine_grid() {
 	Y += SqaureSize.y;
   }
   srand(time(0));
-  generate_random_mines(0,10);
-  calculate_mines_in_area();
+  Vector2I *mine_array = (Vector2I *)calloc(TotalMines,sizeof(Vector2I));
+  generate_random_mines(0,TotalMines,mine_array);
+  calculate_mines_in_area(mine_array);
+  free(mine_array);
 } 
