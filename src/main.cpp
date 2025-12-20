@@ -16,7 +16,7 @@
 
 #define GRID_START 100
 
-#define APPEND_QUEUE(queue,ql,x,y) queue[ql] = {x,y}; ql++;
+#define APPEND_QUEUE(queue,x,y) queue.append({x,y});
 
 #define BEGIN_MODE 0
 
@@ -50,8 +50,6 @@ struct RestartButton_t {
   bool Dead = false; // this is the game over con
   bool Won = false;
 };
-
-
 
 RestartButton_t RestartButton;
 
@@ -87,7 +85,7 @@ struct Cell {
 
 // can be scaled in the future for now just assume 9x9 grid
 int GameDif = BEGIN_MODE;
-Cell *MineGrid;
+Cell *MineGrid = NULL;
 int GridRows = 9;
 int GridCols = 9;
 int TotalMines;
@@ -124,7 +122,7 @@ void get_mine_size();
 int main(void) {
   init_mine_grid();
   SetConfigFlags(FLAG_MSAA_4X_HINT);
-  InitWindow(486, 586, "KittenSweeper! :3");
+  InitWindow(WINDOW_WIDTH, WINDOW_HEIGH, "KittenSweeper! :3");
   SetTargetFPS(60);
   load_assests();
   BeginDrawing();
@@ -139,15 +137,15 @@ int main(void) {
 		 int gridX = int((mouse_pos.x / SqaureSize.x));
 		 int gridY = int(((mouse_pos.y - 100) / SqaureSize.y));
 		 Cell *clicked_cell = get_cell(gridX,gridY);
-		 if(!clicked_cell->Pressed)
-		 clicked_cell->Pressed = true;
+		 if(!clicked_cell->Pressed){
+		   clicked_cell->Pressed = true;
+		   NonMinesLeft--;
+		 }
 		 if (clicked_cell->IsAMine){
 		   RestartButton.Dead = true;
 		 }else if(clicked_cell->MinesInArea == 0){
 		   flood_fill(gridX, gridY);
-		   update_mine_counter();
-		 }else{
-		   NonMinesLeft--;
+		   //update_mine_counter();
 		 }
 	  }else if(mouse_pos.x <= (RestartButton.RestartRect.width + RestartButton.RestartRect.x) && mouse_pos.x >= (RestartButton.RestartRect.x)){
 		if(mouse_pos.y <= (RestartButton.RestartRect.y + RestartButton.RestartRect.height) && mouse_pos.y >= RestartButton.RestartRect.y){
@@ -163,7 +161,7 @@ int main(void) {
 	  if(!RestartButton.Dead && !RestartButton.Won && mouse_pos.y >= 100){
 		int gridX = int((mouse_pos.x / SqaureSize.x));
 		int gridY = int(((mouse_pos.y - 100) / SqaureSize.y));
-		get_cell(gridX, gridY)->Flagged = true;
+		get_cell(gridX, gridY)->Flagged = !get_cell(gridX, gridY)->Flagged;
 		
 	  }
 	}
@@ -212,7 +210,7 @@ void render_game_state() {
 	   }
 	   
    }
-	 // debug printing for mine board
+	 //debug printing for mine board
 	 // char debug_buffer[40];
 	 //  if (current_cell.IsAMine) {
 	 // 	DrawText("M",(current_cell.postion.x),(current_cell.postion.y),20,RED);
@@ -311,138 +309,57 @@ void unload_assests() {
 
 
 void flood_fill(int Sx, int Sy){
-  Vector2I *cord_queue = (Vector2I *)calloc(((GridCols * GridRows) - TotalMines),sizeof(*cord_queue));
+  const Vector2I dir_table[8]{
+	{0,1},
+	{0,-1},
+	{1,0},
+	{-1,0},
+	{1,1},
+	{-1,-1},
+	{-1,1},
+	{1,-1},
+  };
+  Dyn_Arry<Vector2I> cord_queue = new_dynarray<Vector2I>(10);
   flood_hashmap map = create_flood_map((GridCols * GridRows) + 10);
   int qp = 0;
-  int ql = 1;
-  cord_queue[0].x = Sx;
-  cord_queue[0].y = Sy;
+  //int ql = 1;
+  cord_queue.append({Sx,Sy});
   hash_add(cord_queue[0],&map);
-  for(;qp < ql;qp++){
+  for(;qp < cord_queue.len;qp++){
 	Vector2I current_cords = cord_queue[qp];
 	Cell *adjacent_cell;	
-	if(current_cords.x){
-	  adjacent_cell = get_cell(current_cords.x - 1, current_cords.y);
-	  adjacent_cell->Pressed = true;
-  	  if (adjacent_cell->IsAMine){
-	    adjacent_cell->Pressed = false;
+	for(int i = 0; i < 8;i++){
+	  Vector2I adjacent_vector = current_cords + dir_table[i];
+	  if(adjacent_vector.x < 0 || adjacent_vector.y < 0 || adjacent_vector.x >= GridCols || adjacent_vector.y >= GridRows){
+		continue;
 	  }
-	  if(adjacent_cell->MinesInArea == 0){
-		if(!hash_look({current_cords.x - 1, current_cords.y}, &map)){
-		  APPEND_QUEUE(cord_queue, ql, current_cords.x - 1, current_cords.y);
-		  hash_add({current_cords.x - 1,current_cords.y},&map);
-		}
-	  }
-	}
-	if(current_cords.y){
-	  adjacent_cell = get_cell(current_cords.x, current_cords.y - 1);
-	  adjacent_cell->Pressed = true;
-	  if (adjacent_cell->IsAMine){
-	    adjacent_cell->Pressed = false;
-	  }
-	  if(adjacent_cell->MinesInArea == 0){
-		if(!hash_look({current_cords.x,current_cords.y-1}, &map)){
-		  APPEND_QUEUE(cord_queue, ql, current_cords.x, current_cords.y - 1);
-		  hash_add({current_cords.x,current_cords.y}, &map);
-		}
-	  }
-	}
-	if(current_cords.x < GridRows - 1){
-	  adjacent_cell = get_cell(current_cords.x + 1, current_cords.y);
-	  adjacent_cell->Pressed = true;
-	  if (adjacent_cell->IsAMine){
-	    adjacent_cell->Pressed = false;
-	  }
-	  if(adjacent_cell->MinesInArea == 0){
-		if(!hash_look({current_cords.x + 1,current_cords.y}, &map)){
-		  APPEND_QUEUE(cord_queue, ql, current_cords.x + 1, current_cords.y);
-		  hash_add({current_cords.x + 1,current_cords.y}, &map);
-		}
-	  }
-	}
-	if(current_cords.y < GridRows - 1){
-	  adjacent_cell = get_cell(current_cords.x, current_cords.y + 1);
-	  adjacent_cell->Pressed = true;
-	   if (adjacent_cell->IsAMine){
-		 adjacent_cell->Pressed = false;
-	  }
-  	  
-	  if(adjacent_cell->MinesInArea == 0){
-		if(!hash_look({current_cords.x,current_cords.y + 1}, &map)){
-		  APPEND_QUEUE(cord_queue, ql, current_cords.x, current_cords.y + 1);
-		  hash_add({current_cords.x,current_cords.y + 1}, &map);
-		}
-	  }
-	}
-	if(current_cords.y && current_cords.x){
-	  adjacent_cell = get_cell(current_cords.x - 1, current_cords.y - 1);
-	  adjacent_cell->Pressed = true;
-	  if (adjacent_cell->IsAMine){
-		 adjacent_cell->Pressed = false;
-	  }
-  	  
-	  if(adjacent_cell->MinesInArea == 0){
-		if(!hash_look({current_cords.x - 1,current_cords.y - 1}, &map)){
-		  APPEND_QUEUE(cord_queue, ql, current_cords.x - 1, current_cords.y - 1);
-		  hash_add({current_cords.x - 1,current_cords.y - 1}, &map);
-		}
-	  }
-	}
-	if(current_cords.y < GridRows - 1&& current_cords.x < GridCols - 1){
-	  adjacent_cell = get_cell(current_cords.x+1, current_cords.y + 1);
-	  adjacent_cell->Pressed = true;
-	  if (adjacent_cell->IsAMine){
-		 adjacent_cell->Pressed = false;
-	  }
-	  if(adjacent_cell->MinesInArea == 0){
-		if(!hash_look({current_cords.x + 1,current_cords.y + 1}, &map)){
-		  APPEND_QUEUE(cord_queue, ql, current_cords.x+1, current_cords.y+1);
-		  hash_add({current_cords.x + 1, current_cords.y + 1}, &map);
-		}
-	  }
-	}
-   	if(current_cords.y && current_cords.x < GridCols - 1){
-	  adjacent_cell = get_cell(current_cords.x + 1, current_cords.y- 1);
-	  adjacent_cell->Pressed = true;
-	  if (adjacent_cell->IsAMine){
-	    adjacent_cell->Pressed = false;
-	  }
-	  
-	  if(adjacent_cell->MinesInArea == 0){
-		if(!hash_look({current_cords.x + 1,current_cords.y - 1}, &map)){
-		  APPEND_QUEUE(cord_queue, ql, current_cords.x + 1, current_cords.y - 1);
-		  hash_add({current_cords.x + 1,current_cords.y - 1}, &map);
-		  }
-	  }
-	  if(current_cords.y < GridRows - 1 && current_cords.x){
-		adjacent_cell = get_cell(current_cords.x-1, current_cords.y + 1);
+	  adjacent_cell = get_cell(adjacent_vector.x, adjacent_vector.y);
+	  if(!adjacent_cell->Pressed && !adjacent_cell->IsAMine){
 		adjacent_cell->Pressed = true;
-		if (adjacent_cell->IsAMine){
-		  adjacent_cell->Pressed = false;
-		}
-	 if(adjacent_cell->MinesInArea == 0){
-	   if(!hash_look({current_cords.x - 1, current_cords.y + 1}, &map)){
-		  APPEND_QUEUE(cord_queue, ql, current_cords.x - 1, current_cords.y + 1);
-		  hash_add({current_cords.x -1, current_cords.y + 1}, &map);
+		NonMinesLeft--;
+	  }
+	  if(adjacent_cell->MinesInArea == 0){
+		if(!hash_look(adjacent_vector, &map)){
+		  cord_queue.append(adjacent_vector);
+		  hash_add(adjacent_vector, &map);
 		}
 	  }
 	}
-   }
   }
-  	destroy_flood_map(&map);
-	free(cord_queue);
+  destroy_flood_map(&map);
+  cord_queue.free_arr();
 }
-// TODO : I plan on hashing this in the future
-// for now I am just brute forcing it until I come up with a decent hashing solution
-bool flood_check(Vector2I *queue, int ql, Vector2I cords) {
-  for (int i = 0; i < ql; i++) {
-    Vector2I comp_cord = queue[i];
-    if (cords.x == comp_cord.x && cords.y == comp_cord.y) {
-	  return true;
-    }
-  }
-  return false;
-}
+
+// for now I am just brute forcing it until I come up with a decent hashing solution -- solved
+// bool flood_check(Vector2I *queue, int ql, Vector2I cords) {
+//   for (int i = 0; i < ql; i++) {
+//     Vector2I comp_cord = queue[i];
+//     if (cords.x == comp_cord.x && cords.y == comp_cord.y) {
+// 	  return true;
+//     }
+//   }
+//   return false;
+// }
 void update_mine_counter(){
   int non_mines_remaining = 0;
   for(int I = 0; I < 9;I++){
@@ -456,8 +373,8 @@ void update_mine_counter(){
 }
 void generate_random_mines(int in,int total_mines,Vector2I *mine_array) {
   int counter = in;
-  int RandRow = rand() % 9;
-  int RandCol = rand() % 9;
+  int RandRow = rand() % GridRows;
+  int RandCol = rand() % GridCols;
   if (get_cell(RandCol, RandRow)->IsAMine) {
 	return generate_random_mines(counter,total_mines,mine_array);
   }
@@ -476,6 +393,16 @@ Cell *get_cell(int x,int y){
 }
 // I could of probably done this better -- i did end up doing it better
 void calculate_mines_in_area(Vector2I *mine_array) {
+  const Vector2I dir_table[8]{
+	  {0,1},
+	  {0,-1},
+	  {1,0},
+	  {-1,0},
+	  {1,1},
+	  {-1,-1},
+	  {-1,1},
+	  {1,-1},
+  };
   for (int i = 0;i < TotalMines;i++) {
 	Vector2I current_cords = mine_array[i];
 	if(current_cords.x){
@@ -522,13 +449,17 @@ void get_mine_size(){
   SqaureSize.y = float(GRID_HEIGHT) / float(GridRows);
 }
 void init_mine_grid() {
-  int X = 0;
-  int Y = GRID_START;
+  float X = 0;
+  float Y = GRID_START;
   get_mine_size();
+  if(MineGrid != NULL){
+	free(MineGrid);
+    MineGrid = NULL;
+  }
   MineGrid = (Cell*)calloc(GridCols * GridRows,sizeof(*MineGrid));
   NonMinesLeft = (GridCols * GridRows) - TotalMines;
-  for (int I = 0; I < 9; I++) {
-    for (int i = 0; i < 9; i++) {
+  for (int I = 0; I < GridRows; I++) {
+    for (int i = 0; i < GridCols; i++) {
       get_cell(i, I)->postion = Vector2{.x = float(X), .y = float(Y)};
 	  get_cell(i, I)->Pressed = false;
 	  get_cell(i, I)->IsAMine = false;

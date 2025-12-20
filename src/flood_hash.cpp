@@ -5,8 +5,17 @@ struct Vector2I{
   bool operator==(Vector2I other){
 	return (this->x == other.x && this->y == other.y);
   }
+  void operator+=(Vector2I other){
+	this->x += other.x;
+	this->y += other.y;
+  }
+  Vector2I operator+(Vector2I other){
+	Vector2I ret = *this;
+	ret.x += other.x;
+	ret.y += other.y;
+	return ret;
+  }
 };
-
 struct hash_bucket{
   bool occuiped = false;
   Vector2I cord;
