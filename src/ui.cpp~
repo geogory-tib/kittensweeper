@@ -1,0 +1,64 @@
+#include <cstdio>
+#include "include/raylib.h"
+
+#define WINDOW_WIDTH 486
+
+#define WINDOW_HEIGH 586
+#define DropDownBoxH float(WINDOW_HEIGH) * 0.25f
+#define DropDownBoxW float(WINDOW_WIDTH) * 0.25f
+#define DropwDownBoxX float(WINDOW_WIDTH) / 2.0f + 25
+#define DropwDownBoxY 50.0f;
+
+#define LINESPACE 48.83f 
+
+const Color LineColor{
+  .r = 192,
+  .g = 192,
+  .b = 192,
+  .a = 255,
+};
+
+struct DropDownBox{
+  Rectangle Body;
+  //  Rectangle OptionsBox[3];
+  char Options[3][15];
+  Vector2 OptionPos[3];
+  Vector2 LinePos[3];
+  bool showing = false;
+};
+
+DropDownBox init_box(){
+  DropDownBox ret;
+  ret.Body.height = DropDownBoxH;
+  ret.Body.width = DrowDownBoxW;
+  ret.Body.x = DropwDownBoxX;
+  ret.Body.y = DropwDownBoxY;
+  Vector2 StartPos{};
+  StartPos.x = ret.Body.x;
+  StartPos.y = DropwDownBoxY + LINESPACE;
+  for(int i = 0; i < 3; i++){
+	ret.LinePos[i] = StartPos;
+	StartPos.y += LINESPACE;
+  }
+  ret.Options[0] =  "Beginner";
+  ret.Options[1] =  "Intermediate";
+  ret.Options[2] = "Expert";
+  StartPos{DropwDownBoxX + 10,(DropwDownBoxY + LINESPACE)};
+  for(int i = 0 i < 3; i ++){
+	ret.OptionPos[i] = StartPos;
+	StartPos.y += LINESPACE;
+  }
+  return ret;
+}
+
+void draw_drop_down_box(DropDownBox *box){
+  DrawRectangleRec(box->Body,BLACK);
+  Vector2 EndOfLine{(box->Body.x + box->Body.width),0};
+  for(int i = 0; i < 3; i++){
+	EndOfLine.y = box->LinePos[i].y;
+	DrawLineV(box->LinePos,EndOfLine ,LineColor);
+  }
+  for(int i = 0; i < 3; i++){
+	DrawText(box->Options[i], box->OptionPos[i].x, box->OptionPos[i].y, 20, WHITE);
+  }
+}

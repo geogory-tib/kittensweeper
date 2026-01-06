@@ -3,9 +3,12 @@
 #include <cstdlib>
 #include <cstdio>
 #include <time.h>
+
 #include "include/raylib.h"
 #include "include/gtd.h"
 #include "include/flood_hash.h"
+#include "include/kittenui.h"
+
 #define WINDOW_WIDTH 486
 
 #define WINDOW_HEIGH 586
@@ -30,6 +33,11 @@
 
 #define EXPERT_MINE 99
 
+#define RESTART_BUTTON_CHECK_BOUNDSX (mouse_pos.x <= (RestartButton.RestartRect.width + RestartButton.RestartRect.x) && mouse_pos.x >= (RestartButton.RestartRect.x))
+
+#define RESTART_BUTTON_CHECK_BOUNDSY (mouse_pos.y <= (RestartButton.RestartRect.y + RestartButton.RestartRect.height) && mouse_pos.y >= RestartButton.RestartRect.y)
+
+#define NO_MINE_REVEAL_COND (!RestartButton.Dead && !RestartButton.Won && !selection_box.showing)
 const Color BackGroundColor{
   .r = 192,
   .g = 192,
@@ -119,6 +127,8 @@ Cell *get_cell(int x,int y);
 
 void get_mine_size();
 
+bool change_diff_logic(DropDownBox *box);
+
 int main(void) {
   init_mine_grid();
   SetConfigFlags(FLAG_MSAA_4X_HINT);
@@ -129,12 +139,13 @@ int main(void) {
   ClearBackground(BackGroundColor);
   render_game_state();
   EndDrawing();
+  DropDownBox selection_box = init_box();
   for (; !WindowShouldClose() && !IsKeyPressed(KEY_Q);) {
 	BeginDrawing();
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
 	  Vector2 mouse_pos = GetMousePosition();
-	  if ((!RestartButton.Dead && !RestartButton.Won) && mouse_pos.y >= 100){
-		 int gridX = int((mouse_pos.x / SqaureSize.x));
+	  if (NO_MINE_REVEAL_COND && mouse_pos.y >= 100){
+		int gridX = int((mouse_pos.x / SqaureSize.x));
 		 int gridY = int(((mouse_pos.y - 100) / SqaureSize.y));
 		 Cell *clicked_cell = get_cell(gridX,gridY);
 		 if(!clicked_cell->Pressed){
@@ -147,28 +158,42 @@ int main(void) {
 		   flood_fill(gridX, gridY);
 		   //update_mine_counter();
 		 }
-	  }else if(mouse_pos.x <= (RestartButton.RestartRect.width + RestartButton.RestartRect.x) && mouse_pos.x >= (RestartButton.RestartRect.x)){
-		if(mouse_pos.y <= (RestartButton.RestartRect.y + RestartButton.RestartRect.height) && mouse_pos.y >= RestartButton.RestartRect.y){
+	  }else if(RESTART_BUTTON_CHECK_BOUNDSX && !selection_box.showing ){
+		if(RESTART_BUTTON_CHECK_BOUNDSY){
 		  RestartButton.Pressed = true;
 		  init_mine_grid();
 		  RestartButton.Dead = false;
 		  RestartButton.Won = false;
 		}
+	  }else if (selection_box.showing){
+		bool diff_changed = change_diff_logic(&selection_box);
+		if(diff_changed){
+		  init_mine_grid();
+		}
+		selection_box.showing = false;
 	  }
     }
 	if(IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)){
 	  Vector2 mouse_pos = GetMousePosition();
-	  if(!RestartButton.Dead && !RestartButton.Won && mouse_pos.y >= 100){
+	  if(NO_MINE_REVEAL_COND && mouse_pos.y >= 100){
 		int gridX = int((mouse_pos.x / SqaureSize.x));
 		int gridY = int(((mouse_pos.y - 100) / SqaureSize.y));
-		get_cell(gridX, gridY)->Flagged = !get_cell(gridX, gridY)->Flagged;
-		
+		get_cell(gridX, gridY)->Flagged = !get_cell(gridX, gridY)->Flagged;	
+	  }if(RESTART_BUTTON_CHECK_BOUNDSX && !selection_box.showing){
+		if(RESTART_BUTTON_CHECK_BOUNDSY){
+		  selection_box.showing =  true;
+		  draw_drop_down_box(&selection_box);
+		}
 	  }
 	}
 	if(!NonMinesLeft){
 	  RestartButton.Won = true;
 	}
+
 	render_game_state();
+	if(selection_box.showing){
+	  draw_drop_down_box(&selection_box);
+	}
    	EndDrawing();
   }
   unload_assests();
@@ -310,10 +335,10 @@ void unload_assests() {
 
 void flood_fill(int Sx, int Sy){
   const Vector2I dir_table[8]{
+	{-1,0},
 	{0,1},
 	{0,-1},
 	{1,0},
-	{-1,0},
 	{1,1},
 	{-1,-1},
 	{-1,1},
@@ -327,12 +352,19 @@ void flood_fill(int Sx, int Sy){
   hash_add(cord_queue[0],&map);
   for(;qp < cord_queue.len;qp++){
 	Vector2I current_cords = cord_queue[qp];
+	
 	Cell *adjacent_cell;	
 	for(int i = 0; i < 8;i++){
 	  Vector2I adjacent_vector = current_cords + dir_table[i];
-	  if(adjacent_vector.x < 0 || adjacent_vector.y < 0 || adjacent_vector.x >= GridCols || adjacent_vector.y >= GridRows){
+	  // if(adjacent_vector == Vector2I{0,0}){
+	  // 	asm("int3");
+	  // }
+	  if(adjacent_vector.x <= -1 || adjacent_vector.y <= -1 || adjacent_vector.x >= GridCols || adjacent_vector.y >= GridRows){
 		continue;
 	  }
+	  // if(hash_look(adjacent_vector, &map)){
+	  // 	continue;
+	  // }
 	  adjacent_cell = get_cell(adjacent_vector.x, adjacent_vector.y);
 	  if(!adjacent_cell->Pressed && !adjacent_cell->IsAMine){
 		adjacent_cell->Pressed = true;
@@ -350,16 +382,6 @@ void flood_fill(int Sx, int Sy){
   cord_queue.free_arr();
 }
 
-// for now I am just brute forcing it until I come up with a decent hashing solution -- solved
-// bool flood_check(Vector2I *queue, int ql, Vector2I cords) {
-//   for (int i = 0; i < ql; i++) {
-//     Vector2I comp_cord = queue[i];
-//     if (cords.x == comp_cord.x && cords.y == comp_cord.y) {
-// 	  return true;
-//     }
-//   }
-//   return false;
-// }
 void update_mine_counter(){
   int non_mines_remaining = 0;
   for(int I = 0; I < 9;I++){
@@ -405,30 +427,14 @@ void calculate_mines_in_area(Vector2I *mine_array) {
   };
   for (int i = 0;i < TotalMines;i++) {
 	Vector2I current_cords = mine_array[i];
-	if(current_cords.x){
-	   get_cell(current_cords.x - 1,current_cords.y)->MinesInArea++;
+	for(int d = 0; d < 8; d++){
+	  Vector2I adjacent_vec = current_cords + dir_table[d];
+	  if(adjacent_vec.x < 0 || adjacent_vec.y < 0 || adjacent_vec.x >= GridCols || adjacent_vec.y >= GridRows){
+		continue;
+	  }
+	  Cell *adjacent_cell = get_cell(adjacent_vec.x, adjacent_vec.y);
+	  adjacent_cell->MinesInArea++;
 	}
-	if(current_cords.y){
-	  get_cell(current_cords.x,current_cords.y - 1)->MinesInArea++;  
-	}
-	if(current_cords.x < GridCols - 1){
-	  get_cell(current_cords.x + 1,current_cords.y)->MinesInArea++;
-	}
-	if(current_cords.y < GridRows - 1){
-	  get_cell(current_cords.x,current_cords.y + 1)->MinesInArea++; 
-	}
-	if(current_cords.x && current_cords.y){
-	   get_cell(current_cords.x - 1,current_cords.y - 1)->MinesInArea++;
-	}
-	if(current_cords.x < GridCols - 1 && current_cords.y < GridRows - 1){
-	  get_cell(current_cords.x + 1,current_cords.y + 1)->MinesInArea++;
-	}
-	if(current_cords.x && current_cords.y < GridRows - 1){
-	  get_cell(current_cords.x - 1,current_cords.y + 1)->MinesInArea++;
-	}
-	if(current_cords.x < GridCols - 1 && current_cords.y){
-	  get_cell(current_cords.x + 1, current_cords.y - 1)->MinesInArea++;
-	}	
   }
 }
 void get_mine_size(){
@@ -458,6 +464,8 @@ void init_mine_grid() {
   }
   MineGrid = (Cell*)calloc(GridCols * GridRows,sizeof(*MineGrid));
   NonMinesLeft = (GridCols * GridRows) - TotalMines;
+  RestartButton.Dead =  false;
+  RestartButton.Won = false;
   for (int I = 0; I < GridRows; I++) {
     for (int i = 0; i < GridCols; i++) {
       get_cell(i, I)->postion = Vector2{.x = float(X), .y = float(Y)};
@@ -475,3 +483,17 @@ void init_mine_grid() {
   calculate_mines_in_area(mine_array);
   free(mine_array);
 } 
+// bool tells if user clicked inside box or not
+bool change_diff_logic(DropDownBox *box){
+  const float SizeOfOptionBox = 49.0f;
+  Vector2 mouse_pos = GetMousePosition();
+  if(mouse_pos.x <= (box->Body.x + box->Body.width) && mouse_pos.x >= (RestartButton.RestartRect.x)){
+	if(mouse_pos.y <= (box->Body.y + box->Body.height) && mouse_pos.y >= box->Body.y){
+	  int option = int((mouse_pos.y / SizeOfOptionBox)) - 1; 
+	  assert(option < 3);
+	  GameDif = option;
+	  return true;
+	}
+  }
+  return false;
+}
