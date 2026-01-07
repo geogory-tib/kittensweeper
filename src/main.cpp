@@ -31,7 +31,7 @@
 
 #define EXPERT_MODE 2
 
-#define EXPERT_MINE 99
+#define EXPERT_MINE 100
 
 #define RESTART_BUTTON_CHECK_BOUNDSX (mouse_pos.x <= (RestartButton.RestartRect.width + RestartButton.RestartRect.x) && mouse_pos.x >= (RestartButton.RestartRect.x))
 
@@ -130,9 +130,9 @@ void get_mine_size();
 bool change_diff_logic(DropDownBox *box);
 
 int main(void) {
-  init_mine_grid();
   SetConfigFlags(FLAG_MSAA_4X_HINT);
   InitWindow(WINDOW_WIDTH, WINDOW_HEIGH, "KittenSweeper! :3");
+  init_mine_grid();
   SetTargetFPS(60);
   load_assests();
   BeginDrawing();
@@ -447,8 +447,8 @@ void get_mine_size(){
 	GridRows = 16;
 	TotalMines = INTER_MINE;
   }else if(GameDif == EXPERT_MODE){
-	GridCols = 30;
-	GridRows = 16;
+	GridCols = 22;
+	GridRows = 22;
 	TotalMines = EXPERT_MINE;
   }
   SqaureSize.x = float(GRID_WIDTH) / float(GridCols);
